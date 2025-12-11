@@ -1,13 +1,14 @@
 import { FileNode } from "@/types/agent";
 import { cn } from "@/lib/utils";
-import { Play, ExternalLink, RefreshCw, Monitor, Smartphone } from "lucide-react";
+import { ExternalLink, RefreshCw, Monitor, Smartphone, Power, Globe } from "lucide-react";
 import { Button } from "./ui/button";
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo } from "react";
 
 interface LivePreviewProps {
   files: FileNode[];
   className?: string;
-  isRunning?: boolean;
+  isRunning?: boolean; // Agent generation running status
+  isAppRunning?: boolean; // Compiled app running status
 }
 
 // Find all files recursively
@@ -29,11 +30,8 @@ function generatePreviewHtml(files: FileNode[]): string {
   const allFiles = flattenFiles(files);
   
   // Find relevant files
-  const indexFile = allFiles.find(f => f.name === "index.ts" || f.name === "index.js");
   const packageJson = allFiles.find(f => f.name === "package.json");
-  const readme = allFiles.find(f => f.name === "README.md");
   const apiFile = allFiles.find(f => f.name === "api.ts" || f.name === "api.js");
-  const testFile = allFiles.find(f => f.name.includes(".test."));
   
   // Parse package.json for project info
   let projectInfo = { name: "Generated Project", version: "1.0.0", dependencies: {} };
@@ -162,17 +160,6 @@ function generatePreviewHtml(files: FileNode[]): string {
       border-radius: 6px;
       font-size: 12px;
     }
-    .terminal {
-      background: #000;
-      border-radius: 8px;
-      padding: 16px;
-      font-size: 13px;
-      line-height: 1.6;
-    }
-    .terminal-line { margin-bottom: 4px; }
-    .terminal-prompt { color: #22c55e; }
-    .terminal-cmd { color: #e2e8f0; }
-    .terminal-output { color: #94a3b8; }
     .file-count {
       color: #06b6d4;
       font-size: 24px;
@@ -232,17 +219,6 @@ function generatePreviewHtml(files: FileNode[]): string {
     ` : ''}
     
     <div class="section">
-      <h2 class="section-title">Quick Start</h2>
-      <div class="terminal">
-        <div class="terminal-line"><span class="terminal-prompt">$</span> <span class="terminal-cmd">cd ${projectInfo.name}</span></div>
-        <div class="terminal-line"><span class="terminal-prompt">$</span> <span class="terminal-cmd">npm install</span></div>
-        <div class="terminal-line"><span class="terminal-output">✓ Installed ${Object.keys(projectInfo.dependencies || {}).length} dependencies</span></div>
-        <div class="terminal-line"><span class="terminal-prompt">$</span> <span class="terminal-cmd">npm run dev</span></div>
-        <div class="terminal-line"><span class="terminal-output">✓ Server running on http://localhost:3000</span></div>
-      </div>
-    </div>
-    
-    <div class="section">
       <h2 class="section-title">Dependencies</h2>
       <div class="deps">
         ${Object.keys(projectInfo.dependencies || {}).map(dep => 
@@ -256,7 +232,7 @@ function generatePreviewHtml(files: FileNode[]): string {
   `;
 }
 
-export function LivePreview({ files, className, isRunning }: LivePreviewProps) {
+export function LivePreview({ files, className, isRunning, isAppRunning }: LivePreviewProps) {
   const [viewMode, setViewMode] = useState<"desktop" | "mobile">("desktop");
   const [key, setKey] = useState(0);
 
@@ -282,12 +258,12 @@ export function LivePreview({ files, className, isRunning }: LivePreviewProps) {
       <div className={cn("flex flex-col h-full bg-card rounded-lg border border-border", className)}>
         <div className="flex items-center justify-between px-4 py-2 border-b border-border bg-muted/30">
           <div className="flex items-center gap-2">
-            <Play className="h-4 w-4 text-primary" />
+            <Globe className="h-4 w-4 text-primary" />
             <span className="font-semibold text-sm">Live Preview</span>
           </div>
         </div>
         <div className="flex-1 flex items-center justify-center text-muted-foreground">
-          <div className="text-center">
+          <div className="text-center p-6">
             {isRunning ? (
               <>
                 <div className="flex items-center justify-center gap-2 mb-2">
@@ -312,9 +288,22 @@ export function LivePreview({ files, className, isRunning }: LivePreviewProps) {
     <div className={cn("flex flex-col h-full bg-card rounded-lg border border-border overflow-hidden", className)}>
       <div className="flex items-center justify-between px-4 py-2 border-b border-border bg-muted/30">
         <div className="flex items-center gap-2">
-          <Play className="h-4 w-4 text-success" />
-          <span className="font-semibold text-sm">Live Preview</span>
-          <span className="text-xs px-2 py-0.5 rounded bg-success/20 text-success">Running</span>
+          {isAppRunning ? (
+            <>
+              <Globe className="h-4 w-4 text-success" />
+              <span className="font-semibold text-sm">Live Preview</span>
+              <span className="text-xs px-2 py-0.5 rounded bg-success/20 text-success flex items-center gap-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-success animate-pulse"/>
+                Online
+              </span>
+            </>
+          ) : (
+            <>
+              <Globe className="h-4 w-4 text-muted-foreground" />
+              <span className="font-semibold text-sm text-muted-foreground">Live Preview</span>
+              <span className="text-xs px-2 py-0.5 rounded bg-muted text-muted-foreground">Offline</span>
+            </>
+          )}
         </div>
         <div className="flex items-center gap-1">
           <Button
@@ -334,23 +323,38 @@ export function LivePreview({ files, className, isRunning }: LivePreviewProps) {
             <Smartphone className="h-4 w-4" />
           </Button>
           <div className="w-px h-4 bg-border mx-1" />
-          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={handleRefresh}>
+          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={handleRefresh} disabled={!isAppRunning}>
             <RefreshCw className="h-4 w-4" />
           </Button>
-          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={handleOpenExternal}>
+          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={handleOpenExternal} disabled={!isAppRunning}>
             <ExternalLink className="h-4 w-4" />
           </Button>
         </div>
       </div>
       
-      <div className="flex-1 bg-muted/20 overflow-hidden flex items-center justify-center p-4">
+      <div className="flex-1 bg-muted/20 overflow-hidden flex items-center justify-center p-4 relative">
+        {!isAppRunning && (
+          <div className="absolute inset-0 z-10 bg-background/80 backdrop-blur-sm flex flex-col items-center justify-center text-center p-6">
+            <div className="h-12 w-12 rounded-full bg-muted flex items-center justify-center mb-4">
+              <Power className="h-6 w-6 text-muted-foreground" />
+            </div>
+            <h3 className="text-lg font-semibold mb-2">Application Stopped</h3>
+            <p className="text-sm text-muted-foreground mb-4 max-w-xs">
+              The development server is not running. Use the terminal to start the application.
+            </p>
+            <div className="bg-black/50 rounded px-3 py-1.5 font-mono text-xs text-primary border border-primary/20">
+              npm run dev
+            </div>
+          </div>
+        )}
+        
         <div 
           className={cn(
             "bg-background rounded-lg overflow-hidden shadow-2xl transition-all duration-300",
             viewMode === "desktop" ? "w-full h-full" : "w-[375px] h-full max-h-[667px]"
           )}
         >
-          {previewHtml && (
+          {previewHtml && isAppRunning && (
             <iframe
               key={key}
               srcDoc={previewHtml}
@@ -358,6 +362,14 @@ export function LivePreview({ files, className, isRunning }: LivePreviewProps) {
               title="Live Preview"
               sandbox="allow-scripts"
             />
+          )}
+          {(!previewHtml || !isAppRunning) && (
+             <div className="w-full h-full flex items-center justify-center bg-card">
+                <div className="text-center text-muted-foreground opacity-20">
+                   <Monitor className="h-16 w-16 mx-auto mb-2"/>
+                   <span className="font-mono text-sm">Waiting for server...</span>
+                </div>
+             </div>
           )}
         </div>
       </div>
