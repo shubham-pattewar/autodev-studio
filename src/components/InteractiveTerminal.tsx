@@ -52,7 +52,7 @@ export function InteractiveTerminal({
 
   // Simulate server logs when running
   useEffect(() => {
-    let interval: NodeJS.Timeout;
+    let interval: ReturnType<typeof setInterval>;
     if (isServerRunning) {
       const logs = [
         "GET /api/todos 200 45ms",
