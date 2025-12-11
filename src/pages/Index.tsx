@@ -1,9 +1,8 @@
-import { useState, useEffect } from "react";
-import { WebContainer } from "@webcontainer/api";
+import { useState } from "react";
 import { Header } from "@/components/Header";
 import { AgentGrid } from "@/components/AgentGrid";
 import { TerminalLog } from "@/components/TerminalLog";
-import { RealTerminal } from "@/components/RealTerminal";
+import { InteractiveTerminal } from "@/components/InteractiveTerminal";
 import { FileExplorer } from "@/components/FileExplorer";
 import { CodeViewer } from "@/components/CodeViewer";
 import { LivePreview } from "@/components/LivePreview";
@@ -12,79 +11,19 @@ import { useAgentSimulation } from "@/hooks/useAgentSimulation";
 import { FileNode } from "@/types/agent";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { FolderTree, RotateCcw, Download, Package, Code, Play, Terminal, Activity, Loader2 } from "lucide-react";
-import { convertFilesToWebContainer } from "@/lib/fileSystem";
-import { toast } from "sonner";
+import { FolderTree, RotateCcw, Download, Package, Code, Play, Terminal, Activity } from "lucide-react";
 
 const Index = () => {
   const { logs, files, isRunning, activeAgent, agentStatuses, runSimulation, reset } = useAgentSimulation();
   const [selectedFile, setSelectedFile] = useState<FileNode | null>(null);
   const [activeTab, setActiveTab] = useState<string>("preview");
   const [bottomTab, setBottomTab] = useState<string>("logs");
-  
-  // WebContainer State
-  const [webcontainer, setWebcontainer] = useState<WebContainer | null>(null);
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  const [isBooting, setIsBooting] = useState(false);
-
-  // 1. Boot WebContainer on mount
-  useEffect(() => {
-    async function boot() {
-      if (webcontainer) return;
-      setIsBooting(true);
-      try {
-        const instance = await WebContainer.boot();
-        setWebcontainer(instance);
-        
-        instance.on('server-ready', (port, url) => {
-          setPreviewUrl(url);
-          toast.success(`Server running on port ${port}`);
-        });
-        
-      } catch (error) {
-        console.error("Failed to boot WebContainer:", error);
-        toast.error("Failed to start development environment. Check console.");
-      } finally {
-        setIsBooting(false);
-      }
-    }
-    boot();
-  }, []);
-
-  // 2. Sync Files to WebContainer when generation finishes
-  useEffect(() => {
-    if (webcontainer && files.length > 0 && !isRunning && agentStatuses.reviewer === 'completed') {
-      const syncFiles = async () => {
-        try {
-          const fileTree = convertFilesToWebContainer(files);
-          // Assuming the first folder is the project root (e.g., "my-project")
-          const rootDir = files[0].name;
-          
-          await webcontainer.mount(fileTree);
-          
-          toast.success("Files mounted to virtual container");
-          setBottomTab("terminal");
-          
-          // Optional: Auto-install dependencies
-          // This simulates "auto-run" behavior
-          const terminal = document.querySelector('.xterm-helper-textarea');
-          if (terminal) {
-             // We can programmatically write to terminal or just notify user
-             toast.info("Tip: Run 'cd " + rootDir + " && npm install && npm run dev'");
-          }
-        } catch (error) {
-          console.error("File sync error:", error);
-          toast.error("Failed to write files to container");
-        }
-      };
-      syncFiles();
-    }
-  }, [webcontainer, files, isRunning, agentStatuses]);
+  const [isServerRunning, setIsServerRunning] = useState(false);
 
   const handleSubmit = (name: string, story: string) => {
     setSelectedFile(null);
     setActiveTab("preview");
-    setPreviewUrl(null);
+    setIsServerRunning(false);
     runSimulation(name, story);
   };
 
@@ -98,7 +37,15 @@ const Index = () => {
   const handleReset = () => {
     reset();
     setSelectedFile(null);
-    setPreviewUrl(null);
+    setIsServerRunning(false);
+  };
+
+  const handleServerStart = () => {
+    setIsServerRunning(true);
+  };
+
+  const handleServerStop = () => {
+    setIsServerRunning(false);
   };
 
   return (
@@ -171,7 +118,11 @@ const Index = () => {
               </TabsList>
               <div className="flex-1 min-h-0 relative">
                 <TabsContent value="preview" className="absolute inset-0 mt-0">
-                  <LivePreview url={previewUrl} className="h-full" />
+                  <LivePreview 
+                    files={files} 
+                    isAppRunning={isServerRunning}
+                    className="h-full" 
+                  />
                 </TabsContent>
                 <TabsContent value="code" className="absolute inset-0 mt-0">
                   <CodeViewer file={selectedFile} className="h-full" />
@@ -189,7 +140,7 @@ const Index = () => {
                   Agent Logs
                 </TabsTrigger>
                 <TabsTrigger value="terminal" className="flex items-center gap-2">
-                  {isBooting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Terminal className="h-4 w-4" />}
+                  <Terminal className="h-4 w-4" />
                   Terminal
                 </TabsTrigger>
               </TabsList>
@@ -200,7 +151,13 @@ const Index = () => {
                   </div>
                 </TabsContent>
                 <TabsContent value="terminal" className="absolute inset-0 mt-0">
-                  <RealTerminal webcontainer={webcontainer} className="h-full" />
+                  <InteractiveTerminal 
+                    files={files}
+                    onServerStart={handleServerStart}
+                    onServerStop={handleServerStop}
+                    isServerRunning={isServerRunning}
+                    className="h-full" 
+                  />
                 </TabsContent>
               </div>
             </Tabs>
