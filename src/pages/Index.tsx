@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Header } from "@/components/Header";
 import { AgentGrid } from "@/components/AgentGrid";
 import { TerminalLog } from "@/components/TerminalLog";
+import { InteractiveTerminal } from "@/components/InteractiveTerminal";
 import { FileExplorer } from "@/components/FileExplorer";
 import { CodeViewer } from "@/components/CodeViewer";
 import { LivePreview } from "@/components/LivePreview";
@@ -10,19 +11,29 @@ import { useAgentSimulation } from "@/hooks/useAgentSimulation";
 import { FileNode } from "@/types/agent";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { FolderTree, RotateCcw, Download, Package, Code, Play } from "lucide-react";
+import { FolderTree, RotateCcw, Download, Package, Code, Play, Terminal, Activity } from "lucide-react";
 
 const Index = () => {
   const { logs, files, isRunning, activeAgent, agentStatuses, runSimulation, reset } =
     useAgentSimulation();
   const [selectedFile, setSelectedFile] = useState<FileNode | null>(null);
   const [activeTab, setActiveTab] = useState<string>("preview");
+  const [bottomTab, setBottomTab] = useState<string>("logs");
+  const [isAppRunning, setIsAppRunning] = useState(false);
 
   const handleSubmit = (name: string, story: string) => {
     setSelectedFile(null);
     setActiveTab("preview");
+    setIsAppRunning(false);
     runSimulation(name, story);
   };
+
+  // Automatically switch to terminal and suggest running when agents finish
+  useEffect(() => {
+    if (!isRunning && files.length > 0 && agentStatuses.reviewer === 'completed') {
+      setBottomTab("terminal");
+    }
+  }, [isRunning, files, agentStatuses]);
 
   const handleFileSelect = (file: FileNode) => {
     if (file.type === "file") {
@@ -34,6 +45,7 @@ const Index = () => {
   const handleReset = () => {
     reset();
     setSelectedFile(null);
+    setIsAppRunning(false);
   };
 
   return (
@@ -46,25 +58,24 @@ const Index = () => {
       
       <Header />
 
-      <main className="flex-1 container py-6">
-        {/* Agent Grid */}
-        <section className="mb-6 animate-fade-in">
-          <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
-            <Package className="h-5 w-5 text-primary" />
-            Agent Status
-          </h2>
+      <main className="flex-1 container py-6 h-[calc(100vh-4rem)] overflow-hidden flex flex-col">
+        {/* Agent Grid - Compact view */}
+        <section className="mb-4 animate-fade-in flex-shrink-0">
           <AgentGrid activeAgent={activeAgent} agentStatuses={agentStatuses} />
         </section>
 
         {/* Main Content Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-          {/* Left Panel - Job Form */}
-          <div className="lg:col-span-3">
-            <div className="bg-card rounded-lg border border-border p-4">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 flex-1 min-h-0">
+          {/* Left Panel - Job Form & Files */}
+          <div className="lg:col-span-3 flex flex-col gap-4 min-h-0 h-full">
+            <div className="bg-card rounded-lg border border-border p-4 flex-shrink-0">
               <div className="flex items-center justify-between mb-4">
-                <h2 className="font-semibold">New Project</h2>
+                <h2 className="font-semibold flex items-center gap-2">
+                  <Package className="h-4 w-4 text-primary" />
+                  Project
+                </h2>
                 {(files.length > 0 || logs.length > 0) && (
-                  <Button variant="ghost" size="sm" onClick={handleReset}>
+                  <Button variant="ghost" size="sm" onClick={handleReset} className="h-8 w-8 p-0">
                     <RotateCcw className="h-4 w-4" />
                   </Button>
                 )}
@@ -72,19 +83,18 @@ const Index = () => {
               <JobForm onSubmit={handleSubmit} isRunning={isRunning} />
             </div>
 
-            {/* File Explorer */}
             {files.length > 0 && (
-              <div className="mt-4 bg-card rounded-lg border border-border overflow-hidden animate-fade-in">
-                <div className="flex items-center justify-between px-4 py-3 border-b border-border">
+              <div className="bg-card rounded-lg border border-border overflow-hidden animate-fade-in flex-1 flex flex-col min-h-0">
+                <div className="flex items-center justify-between px-4 py-3 border-b border-border flex-shrink-0">
                   <div className="flex items-center gap-2">
                     <FolderTree className="h-4 w-4 text-warning" />
-                    <span className="font-semibold text-sm">Files</span>
+                    <span className="font-semibold text-sm">Explorer</span>
                   </div>
-                  <Button variant="ghost" size="sm" className="h-8">
+                  <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
                     <Download className="h-4 w-4" />
                   </Button>
                 </div>
-                <div className="h-64 overflow-auto">
+                <div className="flex-1 overflow-auto">
                   <FileExplorer
                     files={files}
                     onFileSelect={handleFileSelect}
@@ -96,9 +106,9 @@ const Index = () => {
           </div>
 
           {/* Center Panel - Code/Preview Tabs */}
-          <div className="lg:col-span-5">
-            <Tabs value={activeTab} onValueChange={setActiveTab} className="h-[500px] flex flex-col">
-              <TabsList className="grid w-full grid-cols-2 mb-2">
+          <div className="lg:col-span-5 flex flex-col min-h-0 h-full">
+            <Tabs value={activeTab} onValueChange={setActiveTab} className="h-full flex flex-col">
+              <TabsList className="grid w-full grid-cols-2 mb-2 flex-shrink-0">
                 <TabsTrigger value="preview" className="flex items-center gap-2">
                   <Play className="h-4 w-4" />
                   Live Preview
@@ -108,33 +118,55 @@ const Index = () => {
                   Code View
                 </TabsTrigger>
               </TabsList>
-              <TabsContent value="preview" className="flex-1 mt-0">
-                <LivePreview files={files} className="h-full" isRunning={isRunning} />
-              </TabsContent>
-              <TabsContent value="code" className="flex-1 mt-0">
-                <CodeViewer file={selectedFile} className="h-full" />
-              </TabsContent>
+              <div className="flex-1 min-h-0 relative">
+                <TabsContent value="preview" className="absolute inset-0 mt-0">
+                  <LivePreview 
+                    files={files} 
+                    className="h-full" 
+                    isRunning={isRunning} 
+                    isAppRunning={isAppRunning}
+                  />
+                </TabsContent>
+                <TabsContent value="code" className="absolute inset-0 mt-0">
+                  <CodeViewer file={selectedFile} className="h-full" />
+                </TabsContent>
+              </div>
             </Tabs>
           </div>
 
-          {/* Right Panel - Terminal Logs */}
-          <div className="lg:col-span-4">
-            <div className="bg-card rounded-lg border border-border overflow-hidden h-[500px]">
-              <TerminalLog logs={logs} />
-            </div>
+          {/* Right Panel - Terminal & Logs */}
+          <div className="lg:col-span-4 flex flex-col min-h-0 h-full">
+            <Tabs value={bottomTab} onValueChange={setBottomTab} className="h-full flex flex-col">
+              <TabsList className="grid w-full grid-cols-2 mb-2 flex-shrink-0">
+                <TabsTrigger value="logs" className="flex items-center gap-2">
+                  <Activity className="h-4 w-4" />
+                  Agent Logs
+                </TabsTrigger>
+                <TabsTrigger value="terminal" className="flex items-center gap-2">
+                  <Terminal className="h-4 w-4" />
+                  Terminal
+                </TabsTrigger>
+              </TabsList>
+              <div className="flex-1 min-h-0 relative">
+                <TabsContent value="logs" className="absolute inset-0 mt-0">
+                  <div className="bg-card rounded-lg border border-border overflow-hidden h-full">
+                    <TerminalLog logs={logs} />
+                  </div>
+                </TabsContent>
+                <TabsContent value="terminal" className="absolute inset-0 mt-0">
+                  <InteractiveTerminal 
+                    files={files}
+                    isServerRunning={isAppRunning}
+                    onServerStart={() => setIsAppRunning(true)}
+                    onServerStop={() => setIsAppRunning(false)}
+                    className="h-full"
+                  />
+                </TabsContent>
+              </div>
+            </Tabs>
           </div>
         </div>
       </main>
-
-      {/* Footer */}
-      <footer className="border-t border-border py-4">
-        <div className="container text-center text-sm text-muted-foreground">
-          <p>
-            AutoDev Multi-Agent Platform • Powered by{" "}
-            <span className="text-primary">Gemini AI</span>
-          </p>
-        </div>
-      </footer>
     </div>
   );
 };
