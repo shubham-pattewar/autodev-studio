@@ -4,25 +4,30 @@ import { AgentGrid } from "@/components/AgentGrid";
 import { TerminalLog } from "@/components/TerminalLog";
 import { FileExplorer } from "@/components/FileExplorer";
 import { CodeViewer } from "@/components/CodeViewer";
+import { LivePreview } from "@/components/LivePreview";
 import { JobForm } from "@/components/JobForm";
 import { useAgentSimulation } from "@/hooks/useAgentSimulation";
 import { FileNode } from "@/types/agent";
 import { Button } from "@/components/ui/button";
-import { FolderTree, RotateCcw, Download, Package } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { FolderTree, RotateCcw, Download, Package, Code, Play } from "lucide-react";
 
 const Index = () => {
   const { logs, files, isRunning, activeAgent, agentStatuses, runSimulation, reset } =
     useAgentSimulation();
   const [selectedFile, setSelectedFile] = useState<FileNode | null>(null);
+  const [activeTab, setActiveTab] = useState<string>("preview");
 
   const handleSubmit = (name: string, story: string) => {
     setSelectedFile(null);
+    setActiveTab("preview");
     runSimulation(name, story);
   };
 
   const handleFileSelect = (file: FileNode) => {
     if (file.type === "file") {
       setSelectedFile(file);
+      setActiveTab("code");
     }
   };
 
@@ -90,9 +95,26 @@ const Index = () => {
             )}
           </div>
 
-          {/* Center Panel - Code Viewer */}
+          {/* Center Panel - Code/Preview Tabs */}
           <div className="lg:col-span-5">
-            <CodeViewer file={selectedFile} className="h-[500px]" />
+            <Tabs value={activeTab} onValueChange={setActiveTab} className="h-[500px] flex flex-col">
+              <TabsList className="grid w-full grid-cols-2 mb-2">
+                <TabsTrigger value="preview" className="flex items-center gap-2">
+                  <Play className="h-4 w-4" />
+                  Live Preview
+                </TabsTrigger>
+                <TabsTrigger value="code" className="flex items-center gap-2">
+                  <Code className="h-4 w-4" />
+                  Code View
+                </TabsTrigger>
+              </TabsList>
+              <TabsContent value="preview" className="flex-1 mt-0">
+                <LivePreview files={files} className="h-full" isRunning={isRunning} />
+              </TabsContent>
+              <TabsContent value="code" className="flex-1 mt-0">
+                <CodeViewer file={selectedFile} className="h-full" />
+              </TabsContent>
+            </Tabs>
           </div>
 
           {/* Right Panel - Terminal Logs */}
