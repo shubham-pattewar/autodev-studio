@@ -1,12 +1,15 @@
 import { FileNode } from "@/types/agent";
+import { Globe, Loader2, RefreshCw, ExternalLink } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ExternalLink, RefreshCw, Monitor, Smartphone, Power, Globe } from "lucide-react";
 import { Button } from "./ui/button";
 import { useState, useMemo } from "react";
 
 interface LivePreviewProps {
+  url: string | null;
+  className?: string;
   files: FileNode[];
-  className?: string;
+ 
   isRunning?: boolean; // Agent generation running status
   isAppRunning?: boolean; // Compiled app running status
 }
@@ -232,10 +235,29 @@ function generatePreviewHtml(files: FileNode[]): string {
   `;
 }
 
-export function LivePreview({ files, className, isRunning, isAppRunning }: LivePreviewProps) {
+export function LivePreview({ files, className, isRunning, isAppRunning,url }: LivePreviewProps) {
   const [viewMode, setViewMode] = useState<"desktop" | "mobile">("desktop");
   const [key, setKey] = useState(0);
 
+  if (!url) {
+    return (
+      <div className={cn("flex flex-col h-full bg-card rounded-lg border border-border", className)}>
+        <div className="flex items-center justify-between px-4 py-2 border-b border-border bg-muted/30">
+          <div className="flex items-center gap-2">
+            <Globe className="h-4 w-4 text-muted-foreground" />
+            <span className="font-semibold text-sm text-muted-foreground">Live Preview</span>
+          </div>
+        </div>
+        <div className="flex-1 flex flex-col items-center justify-center text-muted-foreground p-6">
+          <Loader2 className="h-8 w-8 animate-spin mb-4 text-primary" />
+          <p className="text-sm">Waiting for server to start...</p>
+          <p className="text-xs mt-2 opacity-60">Run 'npm run dev' in the terminal</p>
+        </div>
+      </div>
+    );
+  }
+
+  
   const previewHtml = useMemo(() => {
     if (files.length === 0) return null;
     return generatePreviewHtml(files);
